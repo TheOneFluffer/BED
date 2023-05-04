@@ -1,53 +1,150 @@
-const http = require('http');
-const port = 5000;
+const express = require('express');
+const bodyParser = require('body-parser');
 const host = "localhost";
-const path = require('path');
-const fs = require('fs');
-const server = http.createServer(function(req,res){
-    const { headers, method, url } = req;
-    let body = [];
-    
-    req.on('error', (err) => {
-      console.error(err);
-    }).on('data', (chunk) => {
-      body.push(chunk);
-    }).on('end', () => {
-      body = Buffer.concat(body).toString();
+const port = "8080";
+const app = express();
+var urlencodedParser = bodyParser.urlencoded({ extended: false });
+app.use(urlencodedParser); //attach body-parser middleware
+app.use(bodyParser.json());  //parse json data
 
-      console.log(body.length);
-      // At this point, we have the headers, method, url and body, and can now
-      // do whatever we need to in order to respond to this request.
+//code logic for your ws API
+//--------------------
+var users = [
+    {"userid":1, "username":"John", "email":"Mikehawk@abc.com", "age":"30", "password":"abc123"},
+    {"userid":2, "username":"Mary", "email":"Maryland@abc.com", "age":"20", "password":"abc1234"}
+];
 
-        if (req.method=="GET"){ //GET Req will retrieve files from server
-            var filename=req.url;
-            if (filename=="/") {
-                filename="./index.html";
-            }
-            var absFileLocation=path.resolve("./public"+filename);
-            console.log(absFileLocation);
-            fs.exists(absFileLocation,function(exists){
-                if(exists){
-                    res.statusCode=200;
-                } else {
-                    absFileLocation=path.resolve("./public/error.html");
-                    res.statusCode=404;
-                }
-                res.setHeader("Content-Type","text/html");
-                fs.createReadStream(absFileLocation).pipe(res);
-            })
-        }
-        else if (req.method == "POST") {
-            console.log(body);
-            console.log(req.url);
-        }
-    });
-    console.log(req.method);
-    console.log(req.url);
-    // res.statusCode=200;
-    // res.setHeader("Content-Type","text/html");
-    // res.end("<html><body>Welcome to failure management!></body></html>");
+app.get('/user',function(req,res)
+{
+    res.status(200);
+    res.type('json');
+    res.send(users);
 });
 
-server.listen(port,host,function(){
-    console.log(`Server started at http://${host}:${port}`);
+//GET /user/:userid
+app.get("/user/:userid", function(req,res)
+{
+    var userid = req.params.userid;
+    var index = -1;
+    var found = false;
+    for (var i=0;i<users.length;i++) {
+        if (users[i].userid==userid) {
+            found = true;
+            index = i;
+            break;
+        }
+    }
+    if (found) {
+        console.log(users[index]);
+        res.status(200);
+        res.type('json');
+        res.send(`{"user":${JSON.stringify(users[index])}}`);
+    } else {
+        res.status(404);
+        res.type('json');
+        res.send(`{"Message":"Userid ${userid} not found"}`);
+    }
+});
+
+//POST /user
+app.post("/user",function(req,res) {
+    //retrieve user req input values
+    var username = req.body.username;
+    var email = req.body.email;
+    var age = req.body.age;
+    var password = req.body.password;
+
+    //process request according to specs
+    var userid = users[users.length-1].userid+1;
+    //processing 
+    var user = {"userid":userid, "username":username,"email":email,"age":age,"password":password};
+    users.push(user);
+
+    //return the response accordingly
+    res.status(201);
+    res.type('json');
+    res.send(`{"Message":"New user with userid ${userid} created"}`);
+});
+
+//Deleting Users
+app.delete("/user/:userid", function(req,res)
+{
+    //retrieve user req input values
+    var username = req.body.username;
+    var email = req.body.email;
+    var age = req.body.age;
+    var password = req.body.password;
+
+    var userid = req.params.userid;
+    var index = -1;
+    var found = false;
+    for (var i=0;i<users.length;i++)
+    {
+        if (users[i].userid==userid)
+        {
+            found = true;
+            index = i;
+            break;
+        }
+    }
+    if (found)
+    {
+        users.splice(index, 1);
+        res.status(200);
+        res.type('json');
+        res.send(`{"Message":"User with userid ${userid} has been deleted!"}`);
+    }
+    else
+    {
+        res.status(404);
+        res.type('json');
+        res.send(`{"Message":"Userid ${userid} not found"}`);
+    }
+});
+
+//Editing user email
+app.put("/user/:userid", function(req,res)
+{
+    //retrieve user req input values
+    // var username = req.body.username;
+    var email = req.body.email;
+    // var age = req.body.age;
+    // var password = req.body.password;
+
+    var userid = req.params.userid;
+    var index = -1;
+    var found = false;
+    for (var i=0;i<users.length;i++)
+    {
+        if (users[i].userid==userid)
+        {
+            found = true;
+            index = i;
+            break;
+        }
+    }
+    if (found)
+    {
+        // users.splice(index, 1);
+        var Uid = parseInt(userid)-1;
+        console.log(Uid);
+        var newDict = users[Uid];//Create new variable as dictionary
+        newDict["email"] = email;
+        res.status(200);
+        res.type('json');
+        res.send(`{"Message":"Userid ${userid}'s email has been edited!"}`);
+    }
+    else
+    {
+        res.status(404);
+        res.type('json');
+        res.send(`{"Message":"Userid ${userid}'s email cannot be edited!"}`);
+    }
+});
+
+//-------------------
+
+app.listen(port, host, () => 
+{
+    console.log(`Server started and accessible via http://${host}:${port}/`);
 });
